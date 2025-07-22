@@ -1,112 +1,65 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Menu, Sparkles, User, Settings, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Brain, Settings, LogOut, User } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 
-const Header = () => {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+export const Header: React.FC = () => {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
-  const navigation = [
-    { name: 'Features', href: '/features' },
-    { name: 'AI Tools', href: '/builder' },
-    { name: 'Visual to Code', href: '/visual-to-code' },
-    { name: 'Smart Debugger', href: '/smart-debugger' },
-    { name: 'Code Optimizer', href: '/code-optimizer' },
-    { name: 'Multi-File Gen', href: '/multi-file-generator' },
-    { name: 'Pricing', href: '/pricing' },
-    { name: 'Docs', href: '/docs' },
-  ];
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
 
   return (
-    <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2" data-tour="header">
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-2 rounded-lg">
-              <Sparkles className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              AI Builder Pro
-            </span>
+    <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 items-center">
+        <Link to="/" className="flex items-center space-x-2">
+          <Brain className="h-6 w-6 text-primary" />
+          <span className="font-bold">AI Builder</span>
+        </Link>
+        
+        <nav className="ml-auto flex items-center space-x-4">
+          <Link to="/dashboard">
+            <Button variant="ghost" size="sm">Dashboard</Button>
           </Link>
-
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-6" data-tour="navigation">
-            {navigation.map((item) => (
-              <Link 
-                key={item.name}
-                to={item.href} 
-                className="text-gray-700 hover:text-blue-600 transition-colors"
-                data-tour={item.href === '/builder' ? 'ai-builder' : item.href === '/dashboard' ? 'dashboard' : undefined}
-              >
-                {item.name}
-              </Link>
-            ))}
-          </nav>
-
-          {/* User Actions */}
-          <div className="flex items-center space-x-3">
-            <ThemeToggle />
-            <Link to="/settings" className="hidden sm:block">
-              <Button variant="ghost" size="sm">
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </Button>
-            </Link>
-            <Link to="/login">
-              <Button variant="ghost" size="sm">
-                <User className="h-4 w-4 mr-2" />
-                Login
-              </Button>
-            </Link>
-            <Link to="/register">
-              <Button size="sm" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                Start Building
-              </Button>
-            </Link>
-            
-            {/* Mobile menu button */}
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="md:hidden"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-            </Button>
-          </div>
-        </div>
-
-        {/* Mobile Navigation */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200 py-4">
-            <div className="flex flex-col space-y-3">
-              {navigation.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className="text-gray-700 hover:text-blue-600 transition-colors px-2 py-1"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {item.name}
-                </Link>
-              ))}
-              <Link
-                to="/settings"
-                className="text-gray-700 hover:text-blue-600 transition-colors px-2 py-1"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Settings
-              </Link>
-            </div>
-          </div>
-        )}
+          <Link to="/ai-builder">
+            <Button variant="ghost" size="sm">AI Builder</Button>
+          </Link>
+          
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user.user_metadata?.avatar_url} />
+                    <AvatarFallback>
+                      {user.email?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuItem asChild>
+                  <Link to="/settings" className="cursor-pointer">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </nav>
       </div>
     </header>
   );
 };
-
-export default Header;
