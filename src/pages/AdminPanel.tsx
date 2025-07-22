@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +11,7 @@ import SystemSettings from '@/components/admin/SystemSettings';
 import FeatureToggleManager from '@/components/admin/FeatureToggleManager';
 import EnvironmentVariables from '@/components/admin/EnvironmentVariables';
 import DeploymentSettings from '@/components/admin/DeploymentSettings';
+import { ContextCacheManager } from '@/components/admin/ContextCacheManager';
 import { 
   Settings, 
   Users, 
@@ -25,7 +25,8 @@ import {
   Trash2,
   Eye,
   Zap,
-  FileText
+  FileText,
+  Brain
 } from 'lucide-react';
 
 const AdminPanel = () => {
@@ -57,7 +58,7 @@ const AdminPanel = () => {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Admin Panel</h1>
-            <p className="text-muted-foreground mt-1">Manage your AI Builder Pro platform</p>
+            <p className="text-muted-foreground mt-1">Manage your AI Builder Pro platform with advanced context management</p>
           </div>
           <Button className="gradient-primary text-primary-foreground hover:opacity-90">
             <Settings className="h-4 w-4 mr-2" />
@@ -65,8 +66,8 @@ const AdminPanel = () => {
           </Button>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        {/* Enhanced Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <Card className="bg-card/50 backdrop-blur-sm border-primary/10 hover:border-primary/20 transition-colors">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -119,11 +120,25 @@ const AdminPanel = () => {
               </div>
             </CardContent>
           </Card>
+          <Card className="bg-card/50 backdrop-blur-sm border-primary/10 hover:border-primary/20 transition-colors">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Context Cache</p>
+                  <p className="text-2xl font-bold text-foreground">98.5%</p>
+                </div>
+                <div className="bg-blue-500/10 p-3 rounded-lg">
+                  <Brain className="h-8 w-8 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Main Content */}
-        <Tabs defaultValue="generation" className="space-y-6">
-          <TabsList className="grid grid-cols-11 w-full max-w-7xl bg-card/50 backdrop-blur-sm">
+        <Tabs defaultValue="context-cache" className="space-y-6">
+          <TabsList className="grid grid-cols-12 w-full max-w-7xl bg-card/50 backdrop-blur-sm">
+            <TabsTrigger value="context-cache" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Context</TabsTrigger>
             <TabsTrigger value="generation" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Generation</TabsTrigger>
             <TabsTrigger value="prompts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Prompts</TabsTrigger>
             <TabsTrigger value="api-keys" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">API Keys</TabsTrigger>
@@ -136,6 +151,11 @@ const AdminPanel = () => {
             <TabsTrigger value="deployment" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Deployment</TabsTrigger>
             <TabsTrigger value="environment" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Environment</TabsTrigger>
           </TabsList>
+
+          {/* Context Cache Management */}
+          <TabsContent value="context-cache">
+            <ContextCacheManager />
+          </TabsContent>
 
           {/* Generation Management */}
           <TabsContent value="generation">

@@ -13,9 +13,10 @@ import {
   Crown,
   Rocket,
   Menu,
-  X
+  X,
+  Brain
 } from 'lucide-react';
-import ChatInterface from '@/components/chat/ChatInterface';
+import { UnifiedChatInterface } from '@/components/chat/UnifiedChatInterface';
 import CodePreview from '@/components/chat/CodePreview';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -24,18 +25,25 @@ const AIBuilderChat = () => {
   const [generatedFiles, setGeneratedFiles] = useState([]);
   const [userPlan, setUserPlan] = useState<'free' | 'pro' | 'enterprise'>('pro');
   const [showCodePreview, setShowCodePreview] = useState(false);
+  const [projectId] = useState(() => `project-${Date.now()}`);
   const isMobile = useIsMobile();
 
-  const handleCodeGenerated = (code: string, type: string) => {
-    // Handle generated code
-    console.log('Code generated:', { code, type });
+  const handleCodeGenerated = (code: string, files: any[]) => {
+    console.log('Code generated:', { code, files });
+    // Transform to expected format if needed
+    const formattedFiles = files.map(file => ({
+      filename: file.filename || 'generated.js',
+      code: file.code || code,
+      type: file.type || 'component',
+      language: file.language || 'javascript'
+    }));
+    setGeneratedFiles(formattedFiles as any);
   };
 
   const handleCodeOptimized = (optimizedCode: string, filename: string) => {
     console.log('Code optimized:', { optimizedCode, filename });
-    // Update the file with optimized code
     setGeneratedFiles(prev => prev.map(file => 
-      file.filename === filename 
+      (file as any).filename === filename 
         ? { ...file, code: optimizedCode }
         : file
     ));
@@ -66,8 +74,12 @@ const AIBuilderChat = () => {
         <div className="flex items-center justify-between p-2 sm:p-4">
           <div className="flex items-center space-x-2 sm:space-x-4">
             <div className="flex items-center space-x-1 sm:space-x-2">
-              <Sparkles className="h-4 w-4 sm:h-6 sm:w-6 text-primary" />
-              <h1 className="text-sm sm:text-xl font-bold">AI Builder</h1>
+              <Brain className="h-4 w-4 sm:h-6 sm:w-6 text-primary" />
+              <h1 className="text-sm sm:text-xl font-bold">AI Builder Pro</h1>
+              <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20">
+                <Sparkles className="h-3 w-3 mr-1" />
+                Unified
+              </Badge>
             </div>
             
             <Separator orientation="vertical" className="h-4 sm:h-6" />
@@ -120,9 +132,11 @@ const AIBuilderChat = () => {
           <>
             {/* Chat Interface - Always visible on mobile */}
             <div className={`${showCodePreview ? 'hidden' : 'flex'} w-full`}>
-              <ChatInterface 
+              <UnifiedChatInterface 
+                projectId={projectId}
+                framework="react"
+                projectType="web-app"
                 onCodeGenerated={handleCodeGenerated}
-                userPlan={userPlan}
               />
             </div>
 
@@ -154,11 +168,13 @@ const AIBuilderChat = () => {
         ) : (
           /* Desktop Layout */
           <>
-            {/* Chat Interface */}
+            {/* Unified Chat Interface */}
             <div className="w-1/2 border-r">
-              <ChatInterface 
+              <UnifiedChatInterface 
+                projectId={projectId}
+                framework="react"
+                projectType="web-app"
                 onCodeGenerated={handleCodeGenerated}
-                userPlan={userPlan}
               />
             </div>
 
@@ -174,25 +190,25 @@ const AIBuilderChat = () => {
                 <div className="h-full flex items-center justify-center bg-muted/20">
                   <div className="text-center max-w-md">
                     <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Sparkles className="h-8 w-8 text-primary" />
+                      <Brain className="h-8 w-8 text-primary" />
                     </div>
-                    <h3 className="text-lg font-semibold mb-2">Ready to Build</h3>
+                    <h3 className="text-lg font-semibold mb-2">AI Builder Pro Ready</h3>
                     <p className="text-muted-foreground mb-6">
-                      Start a conversation to generate your app, website, or WordPress theme. 
+                      Your intelligent development assistant with persistent memory and unified tool integration. 
                       Code will appear here as it's generated.
                     </p>
                     <div className="space-y-2 text-sm text-muted-foreground">
                       <div className="flex items-center justify-center space-x-2">
                         <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span>Real-time code generation</span>
+                        <span>Context-aware generation</span>
                       </div>
                       <div className="flex items-center justify-center space-x-2">
                         <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        <span>Integrated optimization</span>
+                        <span>Unified tool integration</span>
                       </div>
                       <div className="flex items-center justify-center space-x-2">
                         <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                        <span>Live preview & editing</span>
+                        <span>Persistent project memory</span>
                       </div>
                     </div>
                   </div>
@@ -203,14 +219,16 @@ const AIBuilderChat = () => {
         )}
       </div>
 
-      {/* Status Bar */}
+      {/* Enhanced Status Bar */}
       <div className="border-t bg-muted/30 px-2 sm:px-4 py-1 sm:py-2">
         <div className="flex items-center justify-between text-xs sm:text-sm text-muted-foreground">
           <div className="flex items-center space-x-2 sm:space-x-4">
-            <span className="hidden sm:inline">Status: Ready</span>
+            <span className="hidden sm:inline">Status: AI Ready</span>
             <span className="sm:hidden">Ready</span>
             <span className="hidden sm:inline">•</span>
-            <span>0/1000</span>
+            <span>Project: {projectId.split('-').pop()}</span>
+            <span className="hidden sm:inline">•</span>
+            <span className="text-primary">Context: Active</span>
             {userPlan === 'enterprise' && (
               <>
                 <span className="hidden sm:inline">•</span>
@@ -220,8 +238,8 @@ const AIBuilderChat = () => {
           </div>
           
           <div className="flex items-center space-x-1 sm:space-x-2">
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full"></div>
-            <span className="text-xs sm:text-sm">Connected</span>
+            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-xs sm:text-sm">AI Connected</span>
           </div>
         </div>
       </div>
