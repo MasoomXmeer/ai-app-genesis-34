@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -21,7 +20,7 @@ import {
   Trash2,
   Brain,
   History,
-  Tool
+  Wrench
 } from 'lucide-react';
 import { UnifiedChatService, ChatMessage, ToolType } from '@/services/chat/UnifiedChatService';
 import { SmartDebugger } from '@/components/ai/SmartDebugger';
@@ -340,7 +339,7 @@ export const UnifiedChatInterface: React.FC<UnifiedChatInterfaceProps> = ({
                           {message.role === 'user' ? (
                             <User className="h-4 w-4" />
                           ) : message.role === 'system' ? (
-                            <Tool className="h-4 w-4" />
+                            <Wrench className="h-4 w-4" />
                           ) : (
                             getToolIcon(message.tool)
                           )}

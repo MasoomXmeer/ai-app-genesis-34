@@ -1,37 +1,42 @@
 
-import { AIModel, ProjectComplexity, GenerationOptions } from './types';
+import { AIModel, GenerationOptions } from './types';
 
 export class ModelSelector {
   private static models: AIModel[] = [
     {
-      id: 'gpt-4-turbo',
-      name: 'GPT-4 Turbo',
+      id: 'gpt-4',
+      name: 'GPT-4',
       provider: 'openai',
       capabilities: [
         {
           type: 'code-generation',
-          frameworks: ['react', 'vue', 'angular', 'nextjs'],
-          languages: ['typescript', 'javascript', 'python']
+          frameworks: ['react', 'vue', 'angular', 'laravel', 'node'],
+          languages: ['typescript', 'javascript', 'php', 'python']
+        },
+        {
+          type: 'code-review',
+          frameworks: ['react', 'vue', 'angular', 'laravel'],
+          languages: ['typescript', 'javascript', 'php']
         }
       ],
-      maxTokens: 128000,
+      maxTokens: 8192,
       costPerToken: 0.00003,
       speed: 'medium',
       complexity: 'complex'
     },
     {
-      id: 'claude-3-5-sonnet',
-      name: 'Claude 3.5 Sonnet',
+      id: 'claude-3-sonnet',
+      name: 'Claude 3 Sonnet',
       provider: 'anthropic',
       capabilities: [
         {
-          type: 'architecture',
-          frameworks: ['laravel', 'react', 'vue'],
-          languages: ['php', 'typescript', 'javascript']
+          type: 'code-generation',
+          frameworks: ['react', 'vue', 'laravel'],
+          languages: ['typescript', 'javascript', 'php']
         }
       ],
       maxTokens: 200000,
-      costPerToken: 0.00003,
+      costPerToken: 0.000015,
       speed: 'medium',
       complexity: 'complex'
     },
@@ -42,56 +47,65 @@ export class ModelSelector {
       capabilities: [
         {
           type: 'code-generation',
-          frameworks: ['laravel', 'symfony', 'php'],
-          languages: ['php', 'mysql', 'javascript']
-        }
-      ],
-      maxTokens: 32768,
-      costPerToken: 0.000125,
-      speed: 'fast',
-      complexity: 'medium'
-    },
-    {
-      id: 'llama-3-70b',
-      name: 'Llama 3 70B',
-      provider: 'groq',
-      capabilities: [
-        {
-          type: 'debugging',
           frameworks: ['react', 'vue', 'angular'],
           languages: ['typescript', 'javascript']
         }
       ],
-      maxTokens: 8192,
-      costPerToken: 0.00001,
+      maxTokens: 30720,
+      costPerToken: 0.0000005,
+      speed: 'fast',
+      complexity: 'medium'
+    },
+    {
+      id: 'mixtral-8x7b',
+      name: 'Mixtral 8x7B',
+      provider: 'groq',
+      capabilities: [
+        {
+          type: 'code-generation',
+          frameworks: ['react', 'vue'],
+          languages: ['typescript', 'javascript']
+        }
+      ],
+      maxTokens: 32768,
+      costPerToken: 0.0000002,
       speed: 'fast',
       complexity: 'simple'
     }
   ];
 
   static selectOptimalModel(options: GenerationOptions): AIModel {
-    const { framework, projectType, complexity } = options;
+    const { framework, complexity } = options;
     
-    // Enterprise/Complex projects -> GPT-4 or Claude
-    if (complexity.level === 'enterprise' || complexity.level === 'complex') {
-      if (framework === 'laravel' || projectType === 'fullstack') {
-        return this.models.find(m => m.id === 'claude-3-5-sonnet') || this.models[0];
+    // Filter models that support the framework
+    const compatibleModels = this.models.filter(model =>
+      model.capabilities.some(cap =>
+        cap.frameworks.includes(framework)
+      )
+    );
+
+    if (compatibleModels.length === 0) {
+      return this.models[0]; // Fallback to GPT-4
+    }
+
+    // Select based on complexity
+    const complexityOrder = { 'simple': 1, 'medium': 2, 'complex': 3 };
+    const targetComplexity = complexityOrder[complexity.level];
+
+    // Find the best match for complexity
+    const bestModel = compatibleModels.reduce((best, current) => {
+      const bestComplexity = complexityOrder[best.complexity];
+      const currentComplexity = complexityOrder[current.complexity];
+      
+      // Prefer models that match or slightly exceed the required complexity
+      if (currentComplexity >= targetComplexity && currentComplexity < bestComplexity) {
+        return current;
       }
-      return this.models.find(m => m.id === 'gpt-4-turbo') || this.models[0];
-    }
+      
+      return best;
+    });
 
-    // Laravel/PHP projects -> Gemini Pro
-    if (framework === 'laravel' || projectType.includes('laravel')) {
-      return this.models.find(m => m.id === 'gemini-pro') || this.models[0];
-    }
-
-    // Simple/Fast iterations -> Groq
-    if (complexity.level === 'simple' || options.streaming) {
-      return this.models.find(m => m.id === 'llama-3-70b') || this.models[0];
-    }
-
-    // Default to GPT-4 for React/complex frontend
-    return this.models.find(m => m.id === 'gpt-4-turbo') || this.models[0];
+    return bestModel;
   }
 
   static getAvailableModels(): AIModel[] {
@@ -99,12 +113,10 @@ export class ModelSelector {
   }
 
   static getModelById(id: string): AIModel | undefined {
-    return this.models.find(m => m.id === id);
+    return this.models.find(model => model.id === id);
   }
 
-  static getModelsByCapability(capability: string): AIModel[] {
-    return this.models.filter(m => 
-      m.capabilities.some(c => c.type === capability)
-    );
+  static getModelsByProvider(provider: string): AIModel[] {
+    return this.models.filter(model => model.provider === provider);
   }
 }

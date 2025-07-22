@@ -3,116 +3,104 @@ import { GenerationOptions } from './types';
 
 export class PromptEngine {
   static generateSystemPrompt(options: GenerationOptions): string {
-    const { framework, projectType, features } = options;
+    const { framework, projectType, complexity } = options;
     
-    const basePrompt = `You are an expert software architect and developer specializing in ${framework} development.`;
-    
-    const frameworkSpecific = this.getFrameworkSpecificPrompt(framework);
-    const projectTypePrompt = this.getProjectTypePrompt(projectType);
-    const featuresPrompt = this.getFeaturesPrompt(features);
-    
-    return `${basePrompt}\n\n${frameworkSpecific}\n\n${projectTypePrompt}\n\n${featuresPrompt}\n\nIMPORTANT GUIDELINES:
-- Generate clean, production-ready code
-- Follow best practices and modern patterns
-- Include proper TypeScript types
-- Add comprehensive error handling
-- Ensure code is well-structured and maintainable
-- Include relevant comments and documentation
-- Follow security best practices
-- Make the code responsive and accessible`;
+    return `You are an expert ${framework} developer building a ${projectType} application.
+
+Project Context:
+- Framework: ${framework}
+- Project Type: ${projectType}
+- Complexity Level: ${complexity.level}
+- Estimated Lines: ${complexity.estimatedLines}
+- Required Features: ${options.features.join(', ')}
+
+Guidelines:
+1. Generate clean, production-ready code
+2. Follow ${framework} best practices and conventions
+3. Include proper TypeScript types (if applicable)
+4. Add appropriate error handling
+5. Use modern ES6+ syntax
+6. Include helpful comments for complex logic
+7. Ensure responsive design for UI components
+8. Follow accessibility standards
+
+Code Style:
+- Use functional components for React
+- Prefer composition over inheritance
+- Write self-documenting code
+- Use meaningful variable and function names
+- Keep functions small and focused
+
+Please generate complete, working code that can be immediately used in a ${framework} project.`;
   }
 
-  static generateUserPrompt(description: string, options: GenerationOptions): string {
+  static generateUserPrompt(userRequest: string, options: GenerationOptions): string {
     const { framework, projectType } = options;
     
-    return `Create a professional ${projectType} application using ${framework} with the following requirements:
+    return `Create ${framework} code for the following request in a ${projectType} context:
 
-${description}
+${userRequest}
 
-Please generate:
-1. Complete file structure
-2. All necessary components and logic
-3. Proper configuration files
-4. Basic styling and responsive design
-5. Error handling and loading states
-6. Type definitions where applicable
+Requirements:
+- Generate complete, functional code
+- Include all necessary imports and dependencies
+- Follow ${framework} best practices
+- Add proper error handling
+- Make it production-ready
+- Include TypeScript types if applicable
 
-Ensure the application is production-ready and follows modern development practices.`;
+Please provide the complete implementation.`;
   }
 
-  private static getFrameworkSpecificPrompt(framework: string): string {
-    const prompts = {
-      react: `Focus on modern React development with:
-- Functional components and hooks
-- TypeScript for type safety
-- Modern state management (Context/Zustand)
-- Component composition patterns
-- Performance optimizations`,
-      
-      laravel: `Focus on Laravel best practices:
-- Eloquent ORM and relationships
-- Form requests and validation
-- API resources and controllers
-- Queue jobs and events
-- Middleware and policies
-- Blade components and layouts`,
-      
-      vue: `Focus on Vue.js 3 Composition API:
-- Script setup syntax
-- Reactive state management
-- Component composition
-- TypeScript integration
-- Modern Vue ecosystem`,
-      
-      angular: `Focus on Angular best practices:
-- Component architecture
-- Services and dependency injection
-- RxJS and reactive programming
-- Angular Material components
-- Route guards and resolvers`
-    };
-    
-    return prompts[framework as keyof typeof prompts] || prompts.react;
+  static generateCodeReviewPrompt(code: string, framework: string): string {
+    return `Review the following ${framework} code for:
+
+1. Best practices adherence
+2. Performance optimizations
+3. Security concerns
+4. Code maintainability
+5. Bug detection
+6. TypeScript type safety (if applicable)
+
+Code to review:
+\`\`\`${framework}
+${code}
+\`\`\`
+
+Provide specific suggestions for improvement with code examples.`;
   }
 
-  private static getProjectTypePrompt(projectType: string): string {
-    const prompts = {
-      fintech: `Build a financial technology application with:
-- Security-first architecture
-- Real-time data handling
-- Compliance considerations
-- Advanced analytics
-- Payment processing integration`,
-      
-      ecommerce: `Build an e-commerce platform with:
-- Product catalog management
-- Shopping cart functionality
-- Payment gateway integration
-- Order management system
-- Inventory tracking`,
-      
-      healthcare: `Build a healthcare application with:
-- HIPAA compliance considerations
-- Patient data security
-- Appointment scheduling
-- Medical records management
-- Integration capabilities`,
-      
-      enterprise: `Build an enterprise application with:
-- Scalable architecture
-- Role-based access control
-- Advanced reporting
-- Integration capabilities
-- Multi-tenant support`
-    };
-    
-    return prompts[projectType as keyof typeof prompts] || 'Build a professional web application with modern architecture and best practices.';
+  static generateOptimizationPrompt(code: string, framework: string): string {
+    return `Optimize the following ${framework} code for:
+
+1. Performance improvements
+2. Bundle size reduction
+3. Memory usage optimization
+4. Rendering efficiency (for UI components)
+5. Code maintainability
+
+Original code:
+\`\`\`${framework}
+${code}
+\`\`\`
+
+Provide the optimized version with explanations of the improvements made.`;
   }
 
-  private static getFeaturesPrompt(features: string[]): string {
-    if (!features.length) return '';
-    
-    return `Include the following features:
-${features.map(feature => `- ${feature}`).join('\n')}`;
+  static generateDebugPrompt(code: string, error: string, framework: string): string {
+    return `Debug the following ${framework} code that is producing this error:
+
+Error: ${error}
+
+Code:
+\`\`\`${framework}
+${code}
+\`\`\`
+
+Please:
+1. Identify the root cause of the error
+2. Provide the corrected code
+3. Explain what was wrong and why the fix works
+4. Suggest preventive measures for similar issues`;
   }
 }
