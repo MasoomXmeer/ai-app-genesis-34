@@ -65,7 +65,12 @@ export class ChatService {
       .single();
 
     if (error) throw error;
-    return data;
+    
+    // Type assertion to ensure the role is properly typed
+    return {
+      ...data,
+      role: data.role as 'user' | 'assistant' | 'system'
+    };
   }
 
   async getConversationMessages(conversationId: string): Promise<ChatMessage[]> {
@@ -76,7 +81,12 @@ export class ChatService {
       .order('created_at', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+    
+    // Type assertion to ensure the role is properly typed
+    return (data || []).map(message => ({
+      ...message,
+      role: message.role as 'user' | 'assistant' | 'system'
+    }));
   }
 
   async deleteConversation(conversationId: string): Promise<void> {

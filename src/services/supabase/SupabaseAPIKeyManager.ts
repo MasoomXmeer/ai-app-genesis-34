@@ -1,107 +1,105 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { APIKeyManager } from '@/services/ai/APIKeyManager';
 
-export class SupabaseAPIKeyManager extends APIKeyManager {
-  private static supabaseInstance: SupabaseAPIKeyManager;
+export class SupabaseAPIKeyManager {
+  private static instance: SupabaseAPIKeyManager;
+  private cache: Map<string, string> = new Map();
 
   static getInstance(): SupabaseAPIKeyManager {
-    if (!SupabaseAPIKeyManager.supabaseInstance) {
-      SupabaseAPIKeyManager.supabaseInstance = new SupabaseAPIKeyManager();
+    if (!SupabaseAPIKeyManager.instance) {
+      SupabaseAPIKeyManager.instance = new SupabaseAPIKeyManager();
     }
-    return SupabaseAPIKeyManager.supabaseInstance;
+    return SupabaseAPIKeyManager.instance;
   }
 
   async setApiKey(provider: string, key: string): Promise<void> {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
 
-      // Simple encryption for demo (in production, use proper encryption)
-      const encryptedKey = btoa(key);
+    // In a real implementation, you would encrypt the key before storing
+    // For now, we'll store it as-is (not recommended for production)
+    const { error } = await supabase
+      .from('user_api_keys')
+      .upsert({
+        user_id: user.id,
+        provider,
+        encrypted_key: key // In production, encrypt this
+      });
 
-      const { error } = await supabase
-        .from('user_api_keys')
-        .upsert({
-          user_id: user.id,
-          provider,
-          encrypted_key: encryptedKey
-        });
-
-      if (error) throw error;
-
-      // Also store in parent class for immediate access
-      super.setApiKey(provider, key);
-    } catch (error) {
-      console.error('Failed to save API key:', error);
-      // Fallback to localStorage
-      super.setApiKey(provider, key);
-    }
+    if (error) throw error;
+    
+    // Update cache
+    this.cache.set(provider, key);
   }
 
   async getApiKey(provider: string): Promise<string | null> {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return super.getApiKey(provider);
-
-      const { data, error } = await supabase
-        .from('user_api_keys')
-        .select('encrypted_key')
-        .eq('user_id', user.id)
-        .eq('provider', provider)
-        .single();
-
-      if (error || !data) return super.getApiKey(provider);
-
-      // Simple decryption for demo
-      const decryptedKey = atob(data.encrypted_key);
-      
-      // Cache in parent class
-      super.setApiKey(provider, decryptedKey);
-      
-      return decryptedKey;
-    } catch (error) {
-      console.error('Failed to get API key:', error);
-      return super.getApiKey(provider);
+    // Check cache first
+    if (this.cache.has(provider)) {
+      return this.cache.get(provider) || null;
     }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data, error } = await supabase
+      .from('user_api_keys')
+      .select('encrypted_key')
+      .eq('user_id', user.id)
+      .eq('provider', provider)
+      .single();
+
+    if (error || !data) return null;
+
+    // Cache the result
+    this.cache.set(provider, data.encrypted_key);
+    return data.encrypted_key;
+  }
+
+  async hasApiKey(provider: string): Promise<boolean> {
+    const key = await this.getApiKey(provider);
+    return !!key;
   }
 
   async removeApiKey(provider: string): Promise<void> {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from('user_api_keys')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('provider', provider);
-      }
-    } catch (error) {
-      console.error('Failed to remove API key:', error);
-    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { error } = await supabase
+      .from('user_api_keys')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('provider', provider);
+
+    if (error) throw error;
     
-    // Always remove from parent class
-    super.removeApiKey(provider);
+    // Remove from cache
+    this.cache.delete(provider);
   }
 
-  async loadUserApiKeys(): Promise<void> {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  async getAvailableProviders(): Promise<string[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
 
-      const { data, error } = await supabase
-        .from('user_api_keys')
-        .select('provider, encrypted_key')
-        .eq('user_id', user.id);
+    const { data, error } = await supabase
+      .from('user_api_keys')
+      .select('provider')
+      .eq('user_id', user.id);
 
-      if (error || !data) return;
+    if (error) return [];
+    
+    return data.map(item => item.provider);
+  }
 
-      data.forEach(({ provider, encrypted_key }) => {
-        const decryptedKey = atob(encrypted_key);
-        super.setApiKey(provider, decryptedKey);
-      });
-    } catch (error) {
-      console.error('Failed to load user API keys:', error);
-    }
+  validateApiKey(provider: string, key: string): boolean {
+    // Basic validation patterns for different providers
+    const patterns = {
+      openai: /^sk-[a-zA-Z0-9]{48}$/,
+      anthropic: /^sk-ant-[a-zA-Z0-9\-_]{95}$/,
+      google: /^[a-zA-Z0-9\-_]{39}$/,
+      groq: /^gsk_[a-zA-Z0-9]{52}$/
+    };
+
+    const pattern = patterns[provider as keyof typeof patterns];
+    return pattern ? pattern.test(key) : true;
   }
 }
