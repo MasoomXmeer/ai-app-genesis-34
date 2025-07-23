@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -83,30 +84,42 @@ const AdminPanel = () => {
     try {
       setLoading(true);
       
-      // Load users with project and conversation counts
+      // Load users
       const { data: usersData, error: usersError } = await supabase
         .from('profiles')
-        .select(`
-          id,
-          email,
-          full_name,
-          created_at,
-          projects:projects(count),
-          conversations:chat_conversations(count)
-        `);
+        .select('id, email, full_name, created_at');
 
       if (usersError) throw usersError;
 
-      // Transform user data
-      const transformedUsers: UserData[] = usersData?.map(user => ({
-        id: user.id,
-        email: user.email,
-        full_name: user.full_name || user.email,
-        created_at: user.created_at,
-        projects_count: user.projects?.[0]?.count || 0,
-        conversations_count: user.conversations?.[0]?.count || 0,
-        status: 'active' as const
-      })) || [];
+      // Load projects count per user
+      const { data: projectCounts, error: projectCountError } = await supabase
+        .from('projects')
+        .select('user_id');
+
+      if (projectCountError) throw projectCountError;
+
+      // Load conversations count per user
+      const { data: conversationCounts, error: conversationCountError } = await supabase
+        .from('chat_conversations')
+        .select('user_id');
+
+      if (conversationCountError) throw conversationCountError;
+
+      // Process user data with counts
+      const transformedUsers: UserData[] = usersData?.map(user => {
+        const userProjectCount = projectCounts?.filter(p => p.user_id === user.id).length || 0;
+        const userConversationCount = conversationCounts?.filter(c => c.user_id === user.id).length || 0;
+        
+        return {
+          id: user.id,
+          email: user.email,
+          full_name: user.full_name || user.email,
+          created_at: user.created_at,
+          projects_count: userProjectCount,
+          conversations_count: userConversationCount,
+          status: 'active' as const
+        };
+      }) || [];
 
       setUsers(transformedUsers);
 
@@ -121,22 +134,25 @@ const AdminPanel = () => {
           project_type,
           status,
           created_at,
-          profiles:user_id(email)
+          user_id
         `)
         .order('created_at', { ascending: false });
 
       if (projectsError) throw projectsError;
 
-      const transformedProjects: ProjectData[] = projectsData?.map(project => ({
-        id: project.id,
-        name: project.name,
-        description: project.description || '',
-        framework: project.framework,
-        project_type: project.project_type,
-        status: project.status,
-        created_at: project.created_at,
-        user_email: project.profiles?.email || 'Unknown'
-      })) || [];
+      const transformedProjects: ProjectData[] = projectsData?.map(project => {
+        const projectUser = usersData?.find(u => u.id === project.user_id);
+        return {
+          id: project.id,
+          name: project.name,
+          description: project.description || '',
+          framework: project.framework,
+          project_type: project.project_type,
+          status: project.status,
+          created_at: project.created_at,
+          user_email: projectUser?.email || 'Unknown'
+        };
+      }) || [];
 
       setProjects(transformedProjects);
 

@@ -32,6 +32,10 @@ export class SupabaseAPIKeyManager {
     this.cache.set(provider, key);
   }
 
+  async saveApiKey(provider: string, key: string): Promise<void> {
+    return this.setApiKey(provider, key);
+  }
+
   async getApiKey(provider: string): Promise<string | null> {
     // Check cache first
     if (this.cache.has(provider)) {
@@ -88,6 +92,10 @@ export class SupabaseAPIKeyManager {
     if (error) return [];
     
     return data.map(item => item.provider);
+  }
+
+  async getConfiguredProviders(): Promise<string[]> {
+    return this.getAvailableProviders();
   }
 
   validateApiKey(provider: string, key: string): boolean {
