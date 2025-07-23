@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import Layout from "@/components/layout/Layout";
 import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -30,91 +31,98 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <AuthProvider>
           <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<Landing />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/features" element={<Features />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/documentation" element={<Documentation />} />
-            <Route path="/examples" element={<Examples />} />
-            <Route path="/blog" element={<Blog />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/terms" element={<Terms />} />
+            {/* Public Routes with Layout */}
+            <Route path="/" element={<Layout><Landing /></Layout>} />
+            <Route path="/auth" element={<Layout><Auth /></Layout>} />
+            <Route path="/login" element={<Layout><Login /></Layout>} />
+            <Route path="/register" element={<Layout><Register /></Layout>} />
+            <Route path="/features" element={<Layout><Features /></Layout>} />
+            <Route path="/pricing" element={<Layout><Pricing /></Layout>} />
+            <Route path="/documentation" element={<Layout><Documentation /></Layout>} />
+            <Route path="/examples" element={<Layout><Examples /></Layout>} />
+            <Route path="/blog" element={<Layout><Blog /></Layout>} />
+            <Route path="/privacy" element={<Layout><Privacy /></Layout>} />
+            <Route path="/terms" element={<Layout><Terms /></Layout>} />
             
-            {/* Protected Routes */}
+            {/* Protected Routes with Layout */}
             <Route path="/dashboard" element={
               <ProtectedRoute>
-                <Dashboard />
+                <Layout><Dashboard /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/app" element={
               <ProtectedRoute>
-                <Index />
+                <Layout><Index /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/settings" element={
               <ProtectedRoute>
-                <Settings />
+                <Layout><Settings /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/ai-builder" element={
               <ProtectedRoute>
-                <AIBuilder />
+                <Layout><AIBuilder /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/ai-builder-chat" element={
               <ProtectedRoute>
-                <AIBuilderChat />
+                <Layout><AIBuilderChat /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/multi-file-generator" element={
               <ProtectedRoute>
-                <MultiFileGenerator />
+                <Layout><MultiFileGenerator /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/smart-debugger" element={
               <ProtectedRoute>
-                <SmartDebugger />
+                <Layout><SmartDebugger /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/code-optimizer" element={
               <ProtectedRoute>
-                <CodeOptimizer />
+                <Layout><CodeOptimizer /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/visual-to-code" element={
               <ProtectedRoute>
-                <VisualToCode />
+                <Layout><VisualToCode /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/workflow-builder" element={
               <ProtectedRoute>
-                <WorkflowBuilder />
+                <Layout><WorkflowBuilder /></Layout>
               </ProtectedRoute>
             } />
             <Route path="/admin" element={
               <ProtectedRoute>
-                <AdminPanel />
+                <Layout><AdminPanel /></Layout>
               </ProtectedRoute>
             } />
             
-            <Route path="*" element={<NotFound />} />
+            <Route path="*" element={<Layout><NotFound /></Layout>} />
           </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 

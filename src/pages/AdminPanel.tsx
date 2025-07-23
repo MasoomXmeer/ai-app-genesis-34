@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import PaymentGatewayConfig from '@/components/admin/PaymentGatewayConfig';
 import GenerationManager from '@/components/admin/GenerationManager';
 import PromptManager from '@/components/admin/PromptManager';
@@ -15,6 +15,7 @@ import DeploymentSettings from '@/components/admin/DeploymentSettings';
 import { ContextCacheManager } from '@/components/admin/ContextCacheManager';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 import { 
   Settings, 
   Users, 
@@ -29,7 +30,9 @@ import {
   Calendar,
   Brain,
   MessageSquare,
-  Code
+  Code,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 
 interface UserData {
@@ -63,6 +66,7 @@ interface StatsData {
 
 const AdminPanel = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [users, setUsers] = useState<UserData[]>([]);
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [stats, setStats] = useState<StatsData>({
@@ -73,6 +77,8 @@ const AdminPanel = () => {
     total_api_keys: 0
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -83,43 +89,54 @@ const AdminPanel = () => {
   const loadAdminData = async () => {
     try {
       setLoading(true);
+      setError(null);
       
       // Load users
       const { data: usersData, error: usersError } = await supabase
         .from('profiles')
-        .select('id, email, full_name, created_at');
+        .select('id, email, full_name, created_at')
+        .order('created_at', { ascending: false });
 
-      if (usersError) throw usersError;
+      if (usersError) {
+        console.error('Users error:', usersError);
+        throw new Error('Failed to load users');
+      }
 
       // Load projects count per user
       const { data: projectCounts, error: projectCountError } = await supabase
         .from('projects')
         .select('user_id');
 
-      if (projectCountError) throw projectCountError;
+      if (projectCountError) {
+        console.error('Project counts error:', projectCountError);
+        throw new Error('Failed to load project counts');
+      }
 
       // Load conversations count per user
       const { data: conversationCounts, error: conversationCountError } = await supabase
         .from('chat_conversations')
         .select('user_id');
 
-      if (conversationCountError) throw conversationCountError;
+      if (conversationCountError) {
+        console.error('Conversation counts error:', conversationCountError);
+        throw new Error('Failed to load conversation counts');
+      }
 
       // Process user data with counts
-      const transformedUsers: UserData[] = usersData?.map(user => {
+      const transformedUsers: UserData[] = (usersData || []).map(user => {
         const userProjectCount = projectCounts?.filter(p => p.user_id === user.id).length || 0;
         const userConversationCount = conversationCounts?.filter(c => c.user_id === user.id).length || 0;
         
         return {
           id: user.id,
-          email: user.email,
-          full_name: user.full_name || user.email,
+          email: user.email || 'No email',
+          full_name: user.full_name || user.email || 'Unknown User',
           created_at: user.created_at,
           projects_count: userProjectCount,
           conversations_count: userConversationCount,
           status: 'active' as const
         };
-      }) || [];
+      });
 
       setUsers(transformedUsers);
 
@@ -138,47 +155,63 @@ const AdminPanel = () => {
         `)
         .order('created_at', { ascending: false });
 
-      if (projectsError) throw projectsError;
+      if (projectsError) {
+        console.error('Projects error:', projectsError);
+        throw new Error('Failed to load projects');
+      }
 
-      const transformedProjects: ProjectData[] = projectsData?.map(project => {
+      const transformedProjects: ProjectData[] = (projectsData || []).map(project => {
         const projectUser = usersData?.find(u => u.id === project.user_id);
         return {
           id: project.id,
-          name: project.name,
-          description: project.description || '',
-          framework: project.framework,
-          project_type: project.project_type,
-          status: project.status,
+          name: project.name || 'Untitled Project',
+          description: project.description || 'No description',
+          framework: project.framework || 'react',
+          project_type: project.project_type || 'webapp',
+          status: project.status || 'active',
           created_at: project.created_at,
-          user_email: projectUser?.email || 'Unknown'
+          user_email: projectUser?.email || 'Unknown User'
         };
-      }) || [];
+      });
 
       setProjects(transformedProjects);
 
       // Load statistics
+      const statsPromises = [
+        supabase.from('profiles').select('*', { count: 'exact', head: true }),
+        supabase.from('projects').select('*', { count: 'exact', head: true }),
+        supabase.from('chat_conversations').select('*', { count: 'exact', head: true }),
+        supabase.from('user_api_keys').select('*', { count: 'exact', head: true })
+      ];
+
       const [
         { count: totalUsers },
         { count: totalProjects },
         { count: totalConversations },
         { count: totalApiKeys }
-      ] = await Promise.all([
-        supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('projects').select('*', { count: 'exact', head: true }),
-        supabase.from('chat_conversations').select('*', { count: 'exact', head: true }),
-        supabase.from('user_api_keys').select('*', { count: 'exact', head: true })
-      ]);
+      ] = await Promise.all(statsPromises);
 
       setStats({
         total_users: totalUsers || 0,
         total_projects: totalProjects || 0,
         total_conversations: totalConversations || 0,
-        active_users: transformedUsers.length,
+        active_users: transformedUsers.filter(u => u.status === 'active').length,
         total_api_keys: totalApiKeys || 0
+      });
+
+      toast({
+        title: "Admin Data Loaded",
+        description: "Successfully loaded all admin panel data",
       });
 
     } catch (error) {
       console.error('Failed to load admin data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load admin data');
+      toast({
+        title: "Error",
+        description: "Failed to load admin data. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -193,9 +226,19 @@ const AdminPanel = () => {
 
       if (error) throw error;
       
+      toast({
+        title: "User Deleted",
+        description: "User has been successfully deleted",
+      });
+      
       await loadAdminData();
     } catch (error) {
       console.error('Failed to delete user:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete user. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -208,15 +251,35 @@ const AdminPanel = () => {
 
       if (error) throw error;
       
+      toast({
+        title: "Project Deleted",
+        description: "Project has been successfully deleted",
+      });
+      
       await loadAdminData();
     } catch (error) {
       console.error('Failed to delete project:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete project. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
+  const filteredUsers = users.filter(user => 
+    user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredProjects = projects.filter(project => 
+    project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    project.user_email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-muted/30 via-background to-accent/10 p-6">
+      <div className="min-h-screen bg-background p-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
@@ -227,24 +290,41 @@ const AdminPanel = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-7xl mx-auto">
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+          <Button onClick={loadAdminData} className="flex items-center">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-muted/30 via-background to-accent/10 p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Admin Panel</h1>
-            <p className="text-muted-foreground mt-1">Manage your AI Builder platform</p>
+            <p className="text-muted-foreground mt-1">Manage your AI Builder Pro platform</p>
           </div>
-          <Button className="gradient-primary text-primary-foreground hover:opacity-90">
-            <Settings className="h-4 w-4 mr-2" />
-            System Settings
+          <Button onClick={loadAdminData} className="flex items-center">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh Data
           </Button>
         </div>
 
         {/* Real-time Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-          <Card className="bg-card/50 backdrop-blur-sm border-primary/10 hover:border-primary/20 transition-colors">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          <Card className="hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -257,7 +337,8 @@ const AdminPanel = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-card/50 backdrop-blur-sm border-primary/10 hover:border-primary/20 transition-colors">
+
+          <Card className="hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -270,7 +351,8 @@ const AdminPanel = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-card/50 backdrop-blur-sm border-primary/10 hover:border-primary/20 transition-colors">
+
+          <Card className="hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -283,7 +365,8 @@ const AdminPanel = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-card/50 backdrop-blur-sm border-primary/10 hover:border-primary/20 transition-colors">
+
+          <Card className="hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -296,7 +379,8 @@ const AdminPanel = () => {
               </div>
             </CardContent>
           </Card>
-          <Card className="bg-card/50 backdrop-blur-sm border-primary/10 hover:border-primary/20 transition-colors">
+
+          <Card className="hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -313,46 +397,46 @@ const AdminPanel = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="users" className="space-y-6">
-          <TabsList className="grid grid-cols-12 w-full max-w-7xl bg-card/50 backdrop-blur-sm">
-            <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Users</TabsTrigger>
-            <TabsTrigger value="projects" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Projects</TabsTrigger>
-            <TabsTrigger value="context-cache" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Context</TabsTrigger>
-            <TabsTrigger value="generation" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Generation</TabsTrigger>
-            <TabsTrigger value="prompts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Prompts</TabsTrigger>
-            <TabsTrigger value="api-keys" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">API Keys</TabsTrigger>
-            <TabsTrigger value="payments" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Payments</TabsTrigger>
-            <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Analytics</TabsTrigger>
-            <TabsTrigger value="system" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">System</TabsTrigger>
-            <TabsTrigger value="features" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Features</TabsTrigger>
-            <TabsTrigger value="deployment" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Deployment</TabsTrigger>
-            <TabsTrigger value="environment" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Environment</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-6 lg:grid-cols-12">
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="projects">Projects</TabsTrigger>
+            <TabsTrigger value="context-cache">Context</TabsTrigger>
+            <TabsTrigger value="generation">Generation</TabsTrigger>
+            <TabsTrigger value="prompts">Prompts</TabsTrigger>
+            <TabsTrigger value="api-keys">API Keys</TabsTrigger>
+            <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="system">System</TabsTrigger>
+            <TabsTrigger value="features">Features</TabsTrigger>
+            <TabsTrigger value="deployment">Deployment</TabsTrigger>
+            <TabsTrigger value="environment">Environment</TabsTrigger>
           </TabsList>
 
-          {/* Real Users Management */}
+          {/* Users Management */}
           <TabsContent value="users">
-            <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
+                <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center">
                     <Users className="h-5 w-5 mr-2 text-primary" />
-                    User Management ({users.length} users)
+                    User Management ({filteredUsers.length} users)
                   </div>
-                  <div className="flex space-x-2">
-                    <Input placeholder="Search users..." className="w-64 bg-background/50" />
-                    <Button onClick={loadAdminData} variant="outline">
-                      Refresh
-                    </Button>
-                  </div>
+                  <Input 
+                    placeholder="Search users..." 
+                    className="w-full sm:w-64" 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {users.map((user) => (
-                    <div key={user.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-primary/10 hover:border-primary/20 transition-colors">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-foreground">{user.full_name}</h4>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
-                        <div className="flex items-center space-x-4 mt-2">
+                  {filteredUsers.map((user) => (
+                    <div key={user.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-muted/30 rounded-lg border hover:border-primary/20 transition-colors gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-foreground truncate">{user.full_name}</h4>
+                        <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                        <div className="flex flex-wrap items-center gap-4 mt-2">
                           <span className="text-xs text-muted-foreground">
                             {user.projects_count} projects
                           </span>
@@ -366,19 +450,19 @@ const AdminPanel = () => {
                         </div>
                       </div>
                       <div className="flex items-center space-x-3">
-                        <Badge variant="default" className="bg-primary text-primary-foreground">
+                        <Badge variant="default">
                           {user.status}
                         </Badge>
-                        <Button variant="ghost" size="sm" className="hover:bg-primary/10">
+                        <Button variant="ghost" size="sm">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" className="hover:bg-primary/10">
+                        <Button variant="ghost" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          className="hover:bg-destructive/10 hover:text-destructive"
+                          className="text-destructive hover:text-destructive"
                           onClick={() => handleDeleteUser(user.id)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -391,29 +475,32 @@ const AdminPanel = () => {
             </Card>
           </TabsContent>
 
-          {/* Real Projects Management */}
+          {/* Projects Management */}
           <TabsContent value="projects">
-            <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
+                <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center">
                     <Code className="h-5 w-5 mr-2 text-primary" />
-                    Project Management ({projects.length} projects)
+                    Project Management ({filteredProjects.length} projects)
                   </div>
-                  <Button onClick={loadAdminData} variant="outline">
-                    Refresh
-                  </Button>
+                  <Input 
+                    placeholder="Search projects..." 
+                    className="w-full sm:w-64" 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {projects.map((project) => (
-                    <div key={project.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border border-primary/10 hover:border-primary/20 transition-colors">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-foreground">{project.name}</h4>
-                        <p className="text-sm text-muted-foreground">{project.description}</p>
-                        <div className="flex items-center space-x-4 mt-2">
-                          <Badge variant="outline" className="border-primary/20">{project.framework}</Badge>
+                  {filteredProjects.map((project) => (
+                    <div key={project.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-muted/30 rounded-lg border hover:border-primary/20 transition-colors gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-foreground truncate">{project.name}</h4>
+                        <p className="text-sm text-muted-foreground truncate">{project.description}</p>
+                        <div className="flex flex-wrap items-center gap-4 mt-2">
+                          <Badge variant="outline">{project.framework}</Badge>
                           <Badge variant="secondary">{project.project_type}</Badge>
                           <span className="text-xs text-muted-foreground">
                             by {project.user_email}
@@ -425,16 +512,16 @@ const AdminPanel = () => {
                         </div>
                       </div>
                       <div className="flex items-center space-x-3">
-                        <Badge variant={project.status === "active" ? "default" : "secondary"} className={project.status === "active" ? "bg-primary text-primary-foreground" : ""}>
+                        <Badge variant={project.status === "active" ? "default" : "secondary"}>
                           {project.status}
                         </Badge>
-                        <Button variant="ghost" size="sm" className="hover:bg-primary/10">
+                        <Button variant="ghost" size="sm">
                           <Eye className="h-4 w-4" />
                         </Button>
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          className="hover:bg-destructive/10 hover:text-destructive"
+                          className="text-destructive hover:text-destructive"
                           onClick={() => handleDeleteProject(project.id)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -460,14 +547,14 @@ const AdminPanel = () => {
           </TabsContent>
 
           <TabsContent value="api-keys">
-            <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
+            <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center">
                     <Key className="h-5 w-5 mr-2 text-primary" />
                     API Provider Management
                   </div>
-                  <Button className="gradient-primary text-primary-foreground hover:opacity-90">
+                  <Button>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Provider
                   </Button>
@@ -488,7 +575,7 @@ const AdminPanel = () => {
 
           <TabsContent value="analytics">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
+              <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
                     <BarChart className="h-5 w-5 mr-2 text-primary" />
@@ -505,7 +592,7 @@ const AdminPanel = () => {
                 </CardContent>
               </Card>
 
-              <Card className="bg-card/50 backdrop-blur-sm border-primary/10">
+              <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
                     <Database className="h-5 w-5 mr-2 text-primary" />
