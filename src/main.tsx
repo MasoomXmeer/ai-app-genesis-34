@@ -1,3 +1,4 @@
+
 import { createRoot } from 'react-dom/client'
 import { ThemeProvider } from 'next-themes'
 import App from './App.tsx'
@@ -19,7 +20,7 @@ if ('serviceWorker' in navigator) {
 createRoot(document.getElementById("root")!).render(
   <ThemeProvider
     attribute="class"
-    defaultTheme="system"
+    defaultTheme="light"
     enableSystem
     disableTransitionOnChange
   >

@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
-import { Brain, LogOut, Settings, User } from 'lucide-react';
+import { Brain, LogOut, Settings, User, Shield, Home } from 'lucide-react';
 
 const Header = () => {
   const { user, signOut } = useAuth();
@@ -22,6 +22,9 @@ const Header = () => {
     navigate('/');
   };
 
+  // Check if user is admin (you can implement your own admin check logic)
+  const isAdmin = user?.email === 'admin@example.com' || user?.user_metadata?.role === 'admin';
+
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -31,16 +34,46 @@ const Header = () => {
             <span className="text-xl font-bold">AI Builder</span>
           </Link>
 
+          {/* Navigation Menu - Different for each user state */}
           <nav className="hidden md:flex items-center space-x-6">
-            <Link to="/features" className="text-sm font-medium hover:text-primary transition-colors">
-              Features
-            </Link>
-            <Link to="/pricing" className="text-sm font-medium hover:text-primary transition-colors">
-              Pricing
-            </Link>
-            <Link to="/documentation" className="text-sm font-medium hover:text-primary transition-colors">
-              Docs
-            </Link>
+            {!user ? (
+              // Public navigation
+              <>
+                <Link to="/features" className="text-sm font-medium hover:text-primary transition-colors">
+                  Features
+                </Link>
+                <Link to="/pricing" className="text-sm font-medium hover:text-primary transition-colors">
+                  Pricing
+                </Link>
+                <Link to="/documentation" className="text-sm font-medium hover:text-primary transition-colors">
+                  Docs
+                </Link>
+                <Link to="/examples" className="text-sm font-medium hover:text-primary transition-colors">
+                  Examples
+                </Link>
+              </>
+            ) : (
+              // Authenticated user navigation
+              <>
+                <Link to="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">
+                  Dashboard
+                </Link>
+                <Link to="/ai-builder" className="text-sm font-medium hover:text-primary transition-colors">
+                  AI Builder
+                </Link>
+                <Link to="/multi-file-generator" className="text-sm font-medium hover:text-primary transition-colors">
+                  Multi-File
+                </Link>
+                <Link to="/smart-debugger" className="text-sm font-medium hover:text-primary transition-colors">
+                  Debugger
+                </Link>
+                {isAdmin && (
+                  <Link to="/admin" className="text-sm font-medium hover:text-primary transition-colors text-orange-600">
+                    Admin
+                  </Link>
+                )}
+              </>
+            )}
           </nav>
 
           <div className="flex items-center space-x-4">
@@ -48,6 +81,7 @@ const Header = () => {
               <>
                 <Link to="/dashboard">
                   <Button variant="ghost" size="sm">
+                    <Home className="h-4 w-4 mr-2" />
                     Dashboard
                   </Button>
                 </Link>
@@ -76,6 +110,15 @@ const Header = () => {
                       <Settings className="mr-2 h-4 w-4" />
                       Settings
                     </DropdownMenuItem>
+                    {isAdmin && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => navigate('/admin')}>
+                          <Shield className="mr-2 h-4 w-4" />
+                          Admin Panel
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleSignOut}>
                       <LogOut className="mr-2 h-4 w-4" />

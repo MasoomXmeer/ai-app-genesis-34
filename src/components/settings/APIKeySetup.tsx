@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,10 +8,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Eye, EyeOff, ExternalLink, Key, Database } from 'lucide-react';
 import { AIServiceManager } from '@/services/ai/AIServiceManager';
+import { SupabaseAPIKeyManager } from '@/services/supabase/SupabaseAPIKeyManager';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 export const APIKeySetup = () => {
+  const { user } = useAuth();
   const [aiService] = useState(() => AIServiceManager.getInstance());
+  const [apiKeyManager] = useState(() => new SupabaseAPIKeyManager());
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [keys, setKeys] = useState<Record<string, string>>({
     openai: '',
@@ -19,6 +23,7 @@ export const APIKeySetup = () => {
     google: '',
     groq: ''
   });
+  const [configuredProviders, setConfiguredProviders] = useState<string[]>([]);
 
   const providers = [
     {
@@ -51,11 +56,26 @@ export const APIKeySetup = () => {
     }
   ];
 
+  useEffect(() => {
+    if (user) {
+      loadConfiguredProviders();
+    }
+  }, [user]);
+
+  const loadConfiguredProviders = async () => {
+    try {
+      const providers = await apiKeyManager.getConfiguredProviders();
+      setConfiguredProviders(providers);
+    } catch (error) {
+      console.error('Failed to load configured providers:', error);
+    }
+  };
+
   const handleKeyChange = (provider: string, value: string) => {
     setKeys(prev => ({ ...prev, [provider]: value }));
   };
 
-  const handleSaveKey = (provider: string) => {
+  const handleSaveKey = async (provider: string) => {
     const key = keys[provider];
     if (!key.trim()) {
       toast({
@@ -66,18 +86,26 @@ export const APIKeySetup = () => {
       return;
     }
 
-    aiService.setApiKey(provider, key);
-    toast({
-      title: "API Key Saved",
-      description: `${provider} API key has been saved successfully`
-    });
+    try {
+      await apiKeyManager.saveApiKey(provider, key);
+      await loadConfiguredProviders();
+      toast({
+        title: "API Key Saved",
+        description: `${provider} API key has been saved successfully`
+      });
+      setKeys(prev => ({ ...prev, [provider]: '' }));
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save API key",
+        variant: "destructive"
+      });
+    }
   };
 
   const toggleKeyVisibility = (provider: string) => {
     setShowKeys(prev => ({ ...prev, [provider]: !prev[provider] }));
   };
-
-  const configuredProviders = aiService.getConfiguredProviders();
 
   return (
     <div className="space-y-6">
@@ -86,19 +114,13 @@ export const APIKeySetup = () => {
         <CardHeader>
           <div className="flex items-center space-x-2">
             <Database className="h-5 w-5 text-blue-600" />
-            <CardTitle className="text-blue-900">Supabase Integration Available</CardTitle>
+            <CardTitle className="text-blue-900">Supabase Integration Active</CardTitle>
           </div>
           <CardDescription className="text-blue-700">
-            For enhanced security and backend functionality, connect your project to Supabase. 
-            This allows secure API key storage, user authentication, and database features.
+            Your API keys are securely stored in Supabase with encryption. 
+            This provides enhanced security and backend functionality.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-100">
-            <ExternalLink className="h-4 w-4 mr-2" />
-            Connect to Supabase
-          </Button>
-        </CardContent>
       </Card>
 
       {/* API Keys Configuration */}
@@ -111,7 +133,7 @@ export const APIKeySetup = () => {
                 <span>AI Provider API Keys</span>
               </CardTitle>
               <CardDescription>
-                Configure API keys for AI providers. Keys are stored locally in your browser.
+                Configure API keys for AI providers. Keys are encrypted and stored securely.
               </CardDescription>
             </div>
             <div className="flex space-x-2">
@@ -176,7 +198,7 @@ export const APIKeySetup = () => {
                       Get API Key
                     </a>
                   </Button>
-                  {aiService.hasApiKey(provider.id) && (
+                  {configuredProviders.includes(provider.id) && (
                     <Badge variant="secondary" className="bg-green-100 text-green-800">
                       Configured
                     </Badge>
